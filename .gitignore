@@ -1,3 +1,9 @@
+# Script output
+sopa_de_letras.pdf
+sopa_de_letras.png
+sopa_de_letras_solucao.pdf
+sopa_de_letras_solucao.png
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
