@@ -33,10 +33,12 @@ def create_letter_soup(
     cols: int = 12,
     allow_diagonals: bool = False,
     allow_backwards: bool = False,
-    seed: Optional[int] = 123
+    seed: Optional[int] = 42
 ):
     rng = random.Random(seed)
-    words = [normalize_word(w) for w in words_pt if normalize_word(w)]
+    # Normalize and deduplicate words
+    normalized_words = [normalize_word(w) for w in words_pt if normalize_word(w)]
+    words = list(dict.fromkeys(normalized_words))  # Preserves order while removing duplicates
     if not words:
         raise ValueError("No valid words provided.")
     max_len = max(len(w) for w in words)
@@ -211,7 +213,15 @@ if __name__ == "__main__":
             sys.exit(2)
         with p.open(encoding='utf-8') as fh:
             # keep original word forms for display; ignore blank lines and comments
-            palavras = [line.strip() for line in fh if line.strip() and not line.strip().startswith('#')]
+            palavras_raw = [line.strip() for line in fh if line.strip() and not line.strip().startswith('#')]
+            # Deduplicate while preserving order (based on normalized form)
+            seen = set()
+            palavras = []
+            for word in palavras_raw:
+                normalized = normalize_word(word)
+                if normalized not in seen:
+                    seen.add(normalized)
+                    palavras.append(word)
     else:
         palavras = ["coração", "bola", "peixe", "casa", "gato", "sol", "pão", "fada", "mão"]
 
