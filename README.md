@@ -54,7 +54,7 @@ Lines starting with `#` are treated as comments and ignored. Blank lines are als
 
 ### Secret Message Feature (Scavenger Hunts)
 
-Add a secret message to your word search puzzle! Words from a message file are shuffled together with the regular words and added to the puzzle. After finding all words, the remaining words (the message words) need to be sorted to reveal the secret message.
+Add a secret message to your word search puzzle! Words from a message file are added to the word list (shuffled with regular words) but **NOT placed in the grid**. Players find all the words that are actually in the grid, and the remaining words from the list (the message words that aren't in the grid) need to be sorted to reveal the secret message.
 
 **Note:** Secret messages are only used in word search puzzles, not in codeword puzzles. Message words are automatically excluded from codeword puzzles.
 
@@ -62,11 +62,12 @@ Add a secret message to your word search puzzle! Words from a message file are s
 python sopa_de_letras.py --words-file palavras.txt --message-file message.txt
 ```
 
+This is perfect for less challenging scavenger hunts for young children (5-year-olds). Players see all words in the list (regular words + message words, shuffled together), find the ones that are actually in the grid, and the words they can't find (the message words) form the secret message when sorted.
+
 The message file format is the same as the word file (one word per line). The words in the message file will be:
-1. Shuffled together with regular words (using the same seed as the puzzle)
-2. Added to the word search puzzle
-3. Displayed in the word list (all words mixed together)
-4. Revealed in the solution file (in the correct order)
+1. Added to the word list and shuffled together with regular words (using the same seed as the puzzle)
+2. **NOT placed in the grid** (they're only in the word list)
+3. Revealed in the solution file (in the correct order)
 
 Example `message.txt`:
 ```
@@ -77,7 +78,7 @@ na
 biblioteca
 ```
 
-When solving the puzzle, players find all words, and the remaining words (the message words) need to be sorted to read: "encontra o tesouro na biblioteca"
+**How it works:** Players see all words in the list (shuffled). They find the words that are actually in the grid. The words they can't find in the grid are the message words. These need to be sorted to reveal the secret message: "encontra o tesouro na biblioteca"
 
 ### Custom Grid Size
 
@@ -131,7 +132,7 @@ python sopa_de_letras.py --words-file palavras.txt --enforce-intersections
 
 **Word Search Options:**
 - `--words-file`, `-f`: Path to file with words (one per line). Lines starting with `#` are ignored.
-- `--message-file`, `-m`: Path to file with secret message words (one per line). These words will be shuffled and added to the puzzle. Lines starting with `#` are ignored.
+- `--message-file`, `-m`: Path to file with secret message words (one per line). These words will be added to the word list but NOT placed in the grid. Lines starting with `#` are ignored.
 - `--rows`: Number of rows in the word search grid (default: 15)
 - `--cols`: Number of columns in the word search grid (default: 15)
 - `--allow-diagonals`: Allow diagonal word placements in word search

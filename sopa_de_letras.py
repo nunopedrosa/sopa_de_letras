@@ -793,7 +793,7 @@ if __name__ == "__main__":
     parser.add_argument('--codeword-hints', type=int, default=3, help='Number of letter-number hints to provide in codeword.')
     parser.add_argument('--seed', type=int, default=42, help='Random seed.')
     parser.add_argument('--output-prefix', default='sopa_de_letras', help='Output files prefix (no extension).')
-    parser.add_argument('--message-file', '-m', help='Path to file with secret message words (one per line). These words will be shuffled and added to the puzzle. Lines starting with # are ignored.')
+    parser.add_argument('--message-file', '-m', help='Path to file with secret message words (one per line). These words will be added to the word list but NOT placed in the grid. Lines starting with # are ignored.')
     args = parser.parse_args()
 
     if args.words_file:
@@ -836,12 +836,14 @@ if __name__ == "__main__":
                     message_words.append(normalized)
         
         if message_words:
-            # Combine regular words and message words, then shuffle all together
-            all_words = palavras + message_words_original
+            # Message words are added to the word list but NOT to the grid
+            # Combine regular words and message words, then shuffle all together for display
+            all_words_for_display = palavras + message_words_original
             rng_shuffle = random.Random(args.seed)
-            rng_shuffle.shuffle(all_words)
-            palavras = all_words
-            print(f"Added {len(message_words_original)} secret message word(s) to the puzzle. All words shuffled together.", file=sys.stderr)
+            rng_shuffle.shuffle(all_words_for_display)
+            # Keep only regular words for grid placement (message words stay out of grid)
+            # palavras stays as regular words only for grid generation
+            print(f"Added {len(message_words_original)} secret message word(s) to the word list (not in grid). All words shuffled together.", file=sys.stderr)
 
     # Generate word search puzzle
     print("Generating word search puzzle...", file=sys.stderr)
@@ -855,31 +857,33 @@ if __name__ == "__main__":
         seed=args.seed
     )
 
-    # Filter out unplaced words from display
-    palavras_ws = [w for w in palavras if normalize_word(w) not in unplaced_words_ws]
+    # Prepare word list for display
+    # Message words are in the word list but NOT in the grid
+    if message_words:
+        # Combine regular words (from grid) with message words (not in grid) for display
+        # Filter out unplaced regular words
+        placed_regular_words = [w for w in palavras if normalize_word(w) not in unplaced_words_ws]
+        # Shuffle all words together (placed regular words + message words)
+        all_words_display = placed_regular_words + message_words_original
+        rng_display = random.Random(args.seed)
+        rng_display.shuffle(all_words_display)
+        palavras_ws = all_words_display
+    else:
+        # No message words - just show placed regular words
+        palavras_ws = [w for w in palavras if normalize_word(w) not in unplaced_words_ws]
     if unplaced_words_ws:
         print(f"Warning: Could not place {len(unplaced_words_ws)} word(s) in word search: {', '.join(unplaced_words_ws)}", file=sys.stderr)
         print(f"These words will not appear in the puzzle.", file=sys.stderr)
 
-    # Identify placed message words and reconstruct the secret message
+    # Message words are not in the grid, so they're always the secret message
     secret_message = None
     has_secret_message = False
     if message_words:
-        message_words_set = set(message_words)
-        placed_message_words_normalized = set(placements.keys()) & message_words_set
-        # Map back to original words in the correct order
-        if placed_message_words_normalized:
-            # Create a mapping from normalized to original (preserving order from message_words_original)
-            normalized_to_original = {}
-            for orig, norm in zip(message_words_original, message_words):
-                if norm not in normalized_to_original:
-                    normalized_to_original[norm] = orig
-            # Get the original words in the order they appear in message_words_original
-            secret_message = [normalized_to_original[norm] for norm in message_words 
-                             if norm in placed_message_words_normalized]
-            has_secret_message = len(secret_message) > 0
-            if has_secret_message:
-                print(f"Secret message contains {len(secret_message)} word(s): {' '.join(secret_message)}", file=sys.stderr)
+        # All message words form the secret message (they're not in the grid)
+        secret_message = message_words_original
+        has_secret_message = len(secret_message) > 0
+        if has_secret_message:
+            print(f"Secret message contains {len(secret_message)} word(s): {' '.join(secret_message)}", file=sys.stderr)
 
     out_prefix = Path(args.output_prefix)
     worksheet_png = out_prefix.with_suffix('.png')
@@ -887,6 +891,7 @@ if __name__ == "__main__":
     solution_png = out_prefix.with_name(out_prefix.stem + '_solucao.png')
     solution_pdf = out_prefix.with_name(out_prefix.stem + '_solucao.pdf')
 
+    # Show secret message hint whenever there's a secret message
     render_worksheet(grid, palavras_ws, output_png=worksheet_png, output_pdf=worksheet_pdf, 
                     has_secret_message=has_secret_message)
     render_solution(grid, placements, output_png=solution_png, output_pdf=solution_pdf, 
