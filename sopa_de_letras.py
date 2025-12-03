@@ -34,7 +34,8 @@ def create_letter_soup(
     allow_diagonals: bool = False,
     allow_backwards: bool = False,
     enforce_intersections: bool = False,
-    seed: Optional[int] = 42
+    seed: Optional[int] = 42,
+    secret_message: Optional[str] = None
 ):
     rng = random.Random(seed)
     # Normalize and deduplicate words
@@ -175,11 +176,43 @@ def create_letter_soup(
         if not placed:
             unplaced_words.append(w)
 
-    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    # Collect all empty tile positions
+    empty_tiles = []
     for r in range(rows):
         for c in range(cols):
             if grid[r][c] == '':
-                grid[r][c] = rng.choice(alphabet)
+                empty_tiles.append((r, c))
+    
+    # If secret message is provided, place it in order in empty tiles
+    if secret_message:
+        # Normalize secret message (remove spaces, accents, convert to uppercase)
+        normalized_message = normalize_word(secret_message)
+        # Remove any non-alphabetic characters
+        normalized_message = ''.join(ch for ch in normalized_message if ch.isalpha())
+        
+        if len(normalized_message) > 0:
+            # Place secret message letters in order in the first empty tiles
+            message_index = 0
+            tiles_filled = []
+            for i, (r, c) in enumerate(empty_tiles):
+                if message_index < len(normalized_message):
+                    grid[r][c] = normalized_message[message_index]
+                    tiles_filled.append((r, c))
+                    message_index += 1
+                else:
+                    break
+            
+            # Remove tiles that were filled with message letters
+            empty_tiles = [tile for tile in empty_tiles if tile not in tiles_filled]
+    
+    # Fill remaining empty tiles with alphabet in order, starting from W
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    # Start from W (index 22)
+    alphabet_start_index = 22
+    alphabet_index = 0
+    for r, c in empty_tiles:
+        grid[r][c] = alphabet[(alphabet_start_index + alphabet_index) % len(alphabet)]
+        alphabet_index += 1
 
     # Combine too_long words with unplaced_words for reporting
     all_unplaced = too_long + unplaced_words
@@ -520,6 +553,7 @@ def render_worksheet(
     output_png: Path = Path("sopa_de_letras.png"),
     output_pdf: Path = Path("sopa_de_letras.pdf"),
     has_secret_message: bool = False,
+    secret_message_type: Optional[str] = None,
 ):
     rows, cols = len(grid), len(grid[0])
     fig = plt.figure(figsize=(8.27, 11.69), dpi=200)  # A4 portrait
@@ -551,8 +585,11 @@ def render_worksheet(
     # Add secret message instructions if applicable
     if has_secret_message:
         y -= 0.02
-        dica_text = "DICA: Depois de encontrares todas as palavras, ordena as restantes para descobrires a mensagem secreta!"
-        wrapped_dica = textwrap.wrap(dica_text, width=70)
+        if secret_message_type == 'text':
+            dica_text = "DICA: Depois de encontrares todas as palavras da lista, descobre a palavra secreta escondida nas letras que sobram no quadro!"
+        else:
+            dica_text = "DICA: Depois de encontrares todas as palavras, ordena as restantes para descobrires a mensagem secreta!"
+        wrapped_dica = textwrap.wrap(dica_text, width=60)
         for line in wrapped_dica:
             ax.text(0.1, y, line, fontsize=11, style='italic', color='darkblue', fontweight='bold')
             y -= 0.025
@@ -567,6 +604,7 @@ def render_solution(
     output_png: Path = Path("sopa_de_letras_solucao.png"),
     output_pdf: Path = Path("sopa_de_letras_solucao.pdf"),
     secret_message: Optional[List[str]] = None,
+    secret_message_type: Optional[str] = None,
 ):
     rows, cols = len(grid), len(grid[0])
     mask = [['.' for _ in range(cols)] for _ in range(rows)]
@@ -595,7 +633,12 @@ def render_solution(
     if secret_message:
         ax.text(0.1, y, "Mensagem Secreta:", fontsize=14, fontweight='bold', color='darkblue')
         y -= 0.025
-        message_txt = " ".join(secret_message)
+        if secret_message_type == 'text' and len(secret_message) == 1:
+            # New type: single string message
+            message_txt = secret_message[0]
+        else:
+            # Old type: list of words
+            message_txt = " ".join(secret_message)
         wrapped_msg = textwrap.wrap(message_txt, width=70)
         for line in wrapped_msg:
             ax.text(0.1, y, line, fontsize=13, style='italic', color='darkblue', fontweight='bold')
@@ -794,6 +837,7 @@ if __name__ == "__main__":
     parser.add_argument('--seed', type=int, default=42, help='Random seed.')
     parser.add_argument('--output-prefix', default='sopa_de_letras', help='Output files prefix (no extension).')
     parser.add_argument('--message-file', '-m', help='Path to file with secret message words (one per line). These words will be added to the word list but NOT placed in the grid. Lines starting with # are ignored.')
+    parser.add_argument('--secret-message-text', '-s', help='Secret message text to spread over empty tiles. The message will be placed in empty tiles after words are placed, and remaining tiles will be filled with alphabet in order.')
     args = parser.parse_args()
 
     if args.words_file:
@@ -845,6 +889,12 @@ if __name__ == "__main__":
             # palavras stays as regular words only for grid generation
             print(f"Added {len(message_words_original)} secret message word(s) to the word list (not in grid). All words shuffled together.", file=sys.stderr)
 
+    # Handle new secret message option (spread over empty tiles)
+    secret_message_text = None
+    if args.secret_message_text:
+        secret_message_text = args.secret_message_text
+        print(f"Secret message will be spread over empty tiles: {secret_message_text}", file=sys.stderr)
+
     # Generate word search puzzle
     print("Generating word search puzzle...", file=sys.stderr)
     grid, placements, unplaced_words_ws = create_letter_soup(
@@ -854,7 +904,8 @@ if __name__ == "__main__":
         allow_diagonals=args.allow_diagonals,
         allow_backwards=args.allow_backwards,
         enforce_intersections=args.enforce_intersections,
-        seed=args.seed
+        seed=args.seed,
+        secret_message=secret_message_text
     )
 
     # Prepare word list for display
@@ -875,15 +926,27 @@ if __name__ == "__main__":
         print(f"Warning: Could not place {len(unplaced_words_ws)} word(s) in word search: {', '.join(unplaced_words_ws)}", file=sys.stderr)
         print(f"These words will not appear in the puzzle.", file=sys.stderr)
 
-    # Message words are not in the grid, so they're always the secret message
+    # Handle secret messages (two types)
     secret_message = None
     has_secret_message = False
+    secret_message_type = None  # 'words' for message-file type, 'text' for secret-message-text type
+    
     if message_words:
-        # All message words form the secret message (they're not in the grid)
+        # Old type: message words are not in the grid
         secret_message = message_words_original
         has_secret_message = len(secret_message) > 0
+        secret_message_type = 'words'
         if has_secret_message:
             print(f"Secret message contains {len(secret_message)} word(s): {' '.join(secret_message)}", file=sys.stderr)
+    elif secret_message_text:
+        # New type: secret message is spread over empty tiles
+        normalized_secret = normalize_word(secret_message_text)
+        normalized_secret = ''.join(ch for ch in normalized_secret if ch.isalpha())
+        if normalized_secret:
+            secret_message = [normalized_secret]  # Store as list for consistency with render_solution
+            has_secret_message = True
+            secret_message_type = 'text'
+            print(f"Secret message text: {secret_message_text}", file=sys.stderr)
 
     out_prefix = Path(args.output_prefix)
     worksheet_png = out_prefix.with_suffix('.png')
@@ -893,9 +956,9 @@ if __name__ == "__main__":
 
     # Show secret message hint whenever there's a secret message
     render_worksheet(grid, palavras_ws, output_png=worksheet_png, output_pdf=worksheet_pdf, 
-                    has_secret_message=has_secret_message)
+                    has_secret_message=has_secret_message, secret_message_type=secret_message_type)
     render_solution(grid, placements, output_png=solution_png, output_pdf=solution_pdf, 
-                   secret_message=secret_message)
+                   secret_message=secret_message, secret_message_type=secret_message_type)
     print(f"Word search puzzle saved: {worksheet_png}, {worksheet_pdf}", file=sys.stderr)
     print(f"Word search solution saved: {solution_png}, {solution_pdf}", file=sys.stderr)
 
