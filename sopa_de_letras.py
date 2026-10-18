@@ -49,88 +49,61 @@ def create_letter_soup(
     if not words:
         raise ValueError(f"All words are too long for a {rows}x{cols} grid.")
 
-    dirs = []
-    dirs.extend([(0, 1), (1, 0)])  # right, down
+    # Right and down, plus downward diagonals. Upward / leftward
+    # directions are backwards, including the up-left diagonal.
+    dirs = [(0, 1), (1, 0)]
     if allow_backwards:
         dirs.extend([(0, -1), (-1, 0)])
     if allow_diagonals:
-        diags = [(1, 1), (-1, -1)]
+        dirs.extend([(1, 1), (1, -1)])
         if allow_backwards:
-            diags.extend([(1, -1), (-1, 1)])
-        dirs.extend(diags)
+            dirs.extend([(-1, -1), (-1, 1)])
 
     grid = [['' for _ in range(cols)] for _ in range(rows)]
     placements = {}
 
     def can_place(word: str, r: int, c: int, dr: int, dc: int, must_intersect: bool = False) -> bool:
+        # Bounds and letter clashes are the common reject, so they come
+        # before the same-direction adjacency scan.
         rr, cc = r, c
         has_intersection = False
-        
-        # Check for overlapping or adjacent words in the same direction (confusing for kids)
-        # Get all cells this word would occupy, plus adjacent cells in the same direction
-        new_word_cells = set()
-        for i in range(len(word)):
-            new_word_cells.add((r + i * dr, c + i * dc))
-        # Also check cells immediately before and after (to catch adjacent words)
-        if len(word) > 0:
-            # Cell before the word
-            new_word_cells.add((r - dr, c - dc))
-            # Cell after the word
-            new_word_cells.add((r + len(word) * dr, c + len(word) * dc))
-        
-        # Check each existing word to see if it overlaps or is adjacent in the same direction
-        for existing_word, existing_coords in placements.items():
-            if len(existing_coords) < 2:
-                continue  # Skip single-letter words
-            
-            # Check if existing word is in the same direction
-            existing_dr = existing_coords[-1][0] - existing_coords[0][0]
-            existing_dc = existing_coords[-1][1] - existing_coords[0][1]
-            # Normalize direction (handle backwards)
-            if existing_dr != 0:
-                existing_dr = existing_dr // abs(existing_dr)
-            if existing_dc != 0:
-                existing_dc = existing_dc // abs(existing_dc)
-            
-            # Normalize the new word's direction for comparison
-            norm_dr, norm_dc = dr, dc
-            if norm_dr != 0:
-                norm_dr = norm_dr // abs(norm_dr) if norm_dr != 0 else 0
-            if norm_dc != 0:
-                norm_dc = norm_dc // abs(norm_dc) if norm_dc != 0 else 0
-            
-            # Check if directions match (same line/row/diagonal)
-            if (norm_dr, norm_dc) == (existing_dr, existing_dc) or (norm_dr, norm_dc) == (-existing_dr, -existing_dc):
-                # Same direction - check for overlap or adjacency
-                existing_cells = set(existing_coords)
-                # Also include cells immediately before and after existing word
-                if len(existing_coords) > 0:
-                    existing_start = existing_coords[0]
-                    existing_end = existing_coords[-1]
-                    existing_cells.add((existing_start[0] - existing_dr, existing_start[1] - existing_dc))
-                    existing_cells.add((existing_end[0] + existing_dr, existing_end[1] + existing_dc))
-                
-                overlap = new_word_cells & existing_cells
-                if len(overlap) > 0:
-                    # They share cells or are adjacent in the same direction - this is confusing
-                    return False
-        
-        # Now check the actual placement
-        for i, ch in enumerate(word):
+        for ch in word:
             if not (0 <= rr < rows and 0 <= cc < cols):
                 return False
             existing = grid[rr][cc]
-            # This line allows words to CROSS when letters match (perpendicular crossings are OK)
+            # Words may cross when the shared letter matches.
             if existing not in ('', ch):
                 return False
-            # Check if this position intersects with an existing word
-            if existing == ch and existing != '':
+            if existing == ch:
                 has_intersection = True
             rr += dr
             cc += dc
-        # If intersections are enforced, the word must intersect with at least one existing word
         if must_intersect and not has_intersection:
             return False
+
+        new_word_cells = {(r + i * dr, c + i * dc) for i in range(len(word))}
+        new_word_cells.add((r - dr, c - dc))
+        new_word_cells.add((r + len(word) * dr, c + len(word) * dc))
+        norm_dr = 0 if dr == 0 else (1 if dr > 0 else -1)
+        norm_dc = 0 if dc == 0 else (1 if dc > 0 else -1)
+
+        for existing_coords in placements.values():
+            if len(existing_coords) < 2:
+                continue
+            existing_dr = existing_coords[-1][0] - existing_coords[0][0]
+            existing_dc = existing_coords[-1][1] - existing_coords[0][1]
+            existing_dr = 0 if existing_dr == 0 else (1 if existing_dr > 0 else -1)
+            existing_dc = 0 if existing_dc == 0 else (1 if existing_dc > 0 else -1)
+            same_axis = (norm_dr, norm_dc) == (existing_dr, existing_dc) or (norm_dr, norm_dc) == (-existing_dr, -existing_dc)
+            if not same_axis:
+                continue
+            existing_cells = set(existing_coords)
+            existing_start = existing_coords[0]
+            existing_end = existing_coords[-1]
+            existing_cells.add((existing_start[0] - existing_dr, existing_start[1] - existing_dc))
+            existing_cells.add((existing_end[0] + existing_dr, existing_end[1] + existing_dc))
+            if new_word_cells & existing_cells:
+                return False
         return True
 
     def do_place(word: str, r: int, c: int, dr: int, dc: int) -> List[Tuple[int, int]]:
@@ -205,14 +178,10 @@ def create_letter_soup(
             # Remove tiles that were filled with message letters
             empty_tiles = [tile for tile in empty_tiles if tile not in tiles_filled]
     
-    # Fill remaining empty tiles with alphabet in order, starting from W
+    # Fill remaining empty tiles with seeded random letters.
     alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    # Start from W (index 22)
-    alphabet_start_index = 22
-    alphabet_index = 0
     for r, c in empty_tiles:
-        grid[r][c] = alphabet[(alphabet_start_index + alphabet_index) % len(alphabet)]
-        alphabet_index += 1
+        grid[r][c] = alphabet[rng.randrange(len(alphabet))]
 
     # Combine too_long words with unplaced_words for reporting
     all_unplaced = too_long + unplaced_words
@@ -837,7 +806,7 @@ if __name__ == "__main__":
     parser.add_argument('--seed', type=int, default=42, help='Random seed.')
     parser.add_argument('--output-prefix', default='sopa_de_letras', help='Output files prefix (no extension).')
     parser.add_argument('--message-file', '-m', help='Path to file with secret message words (one per line). These words will be added to the word list but NOT placed in the grid. Lines starting with # are ignored.')
-    parser.add_argument('--secret-message-text', '-s', help='Secret message text to spread over empty tiles. The message will be placed in empty tiles after words are placed, and remaining tiles will be filled with alphabet in order.')
+    parser.add_argument('--secret-message-text', '-s', help='Secret message text to spread over empty tiles. The message will be placed in empty tiles after words are placed, and remaining tiles will be filled with random letters.')
     args = parser.parse_args()
 
     if args.words_file:

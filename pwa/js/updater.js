@@ -2,7 +2,7 @@
 // version.json is fetched network-only (the SW special-cases it),
 // compared against APP_VERSION, and an Update button triggers
 // skipWaiting -> reload (with a cache-bust fallback).
-export const APP_VERSION = '1.2.2';
+export const APP_VERSION = '1.2.3';
 
 export async function checkForUpdate() {
   if (!('serviceWorker' in navigator)) return { status: 'unsupported' };
@@ -48,12 +48,20 @@ export async function applyUpdate() {
     });
   }
 
-  // Fallback: if nothing activated within 2.5s, nuke caches and reload.
-  setTimeout(async () => {
+  // If the new worker is slow to install, keep waiting. Deleting caches
+  // here raced that install and forced a full re-download.
+  let extraWaits = 0;
+  const giveUp = async () => {
     if (reloaded) return;
-    const keys = await caches.keys();
-    await Promise.all(keys.map(k => caches.delete(k)));
-    if (reg) await reg.unregister();
+    const current = await navigator.serviceWorker.getRegistration();
+    if (current && (current.installing || current.waiting) && extraWaits < 2) {
+      extraWaits++;
+      const worker = current.waiting || current.installing;
+      if (worker && navigator.serviceWorker.controller) worker.postMessage({ type: 'SKIP_WAITING' });
+      setTimeout(giveUp, 10000);
+      return;
+    }
     reload();
-  }, 2500);
+  };
+  setTimeout(giveUp, 8000);
 }

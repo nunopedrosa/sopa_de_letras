@@ -33,57 +33,65 @@ export function createLetterSoup(wordsPt, {
     throw e;
   }
 
-  const dirs = [[0, 1], [1, 0]]; // right, down
+  // Right and down, plus downward diagonals. Upward / leftward
+  // directions are backwards, including the up-left diagonal.
+  const dirs = [[0, 1], [1, 0]];
   if (allowBackwards) dirs.push([0, -1], [-1, 0]);
   if (allowDiagonals) {
-    const diags = [[1, 1], [-1, -1]];
-    if (allowBackwards) diags.push([1, -1], [-1, 1]);
-    dirs.push(...diags);
+    dirs.push([1, 1], [1, -1]);
+    if (allowBackwards) dirs.push([-1, -1], [-1, 1]);
   }
 
   const grid = Array.from({ length: rows }, () => Array(cols).fill(''));
   const placements = {}; // word -> [[r,c],...]
+  // Same-axis words, with the cells just before and after cached so
+  // placement attempts don't rebuild those sets.
+  const blocksByAxis = new Map();
+
+  function axisOf(dr, dc) {
+    let ndr = dr === 0 ? 0 : Math.sign(dr);
+    let ndc = dc === 0 ? 0 : Math.sign(dc);
+    if (ndr < 0 || (ndr === 0 && ndc < 0)) { ndr = -ndr; ndc = -ndc; }
+    return `${ndr},${ndc}`;
+  }
+
+  function rememberPlacement(coords, dr, dc) {
+    if (coords.length < 2) return;
+    const eDr = dr === 0 ? 0 : Math.sign(dr);
+    const eDc = dc === 0 ? 0 : Math.sign(dc);
+    const cells = new Set(coords.map(([er, ec]) => `${er},${ec}`));
+    const s = coords[0], e = coords[coords.length - 1];
+    cells.add(`${s[0] - eDr},${s[1] - eDc}`);
+    cells.add(`${e[0] + eDr},${e[1] + eDc}`);
+    const axis = axisOf(dr, dc);
+    const list = blocksByAxis.get(axis);
+    if (list) list.push(cells); else blocksByAxis.set(axis, [cells]);
+  }
 
   function canPlace(word, r, c, dr, dc, mustIntersect) {
+    // Bounds and letter clashes are the common reject, so they come
+    // before the same-direction adjacency scan.
     let rr = r, cc = c;
     let hasIntersection = false;
-
-    // Collect cells this word would occupy, plus the cells immediately
-    // before and after it, to detect same-direction overlap/adjacency.
-    const newCells = new Set();
-    for (let i = 0; i < word.length; i++) newCells.add(`${r + i * dr},${c + i * dc}`);
-    newCells.add(`${r - dr},${c - dc}`);
-    newCells.add(`${r + word.length * dr},${c + word.length * dc}`);
-
-    const normDr = dr === 0 ? 0 : Math.sign(dr);
-    const normDc = dc === 0 ? 0 : Math.sign(dc);
-
-    for (const coords of Object.values(placements)) {
-      if (coords.length < 2) continue;
-      let eDr = coords[coords.length - 1][0] - coords[0][0];
-      let eDc = coords[coords.length - 1][1] - coords[0][1];
-      eDr = eDr === 0 ? 0 : Math.sign(eDr);
-      eDc = eDc === 0 ? 0 : Math.sign(eDc);
-      if ((normDr === eDr && normDc === eDc) || (normDr === -eDr && normDc === -eDc)) {
-        const existCells = new Set(coords.map(([er, ec]) => `${er},${ec}`));
-        const s = coords[0], e = coords[coords.length - 1];
-        existCells.add(`${s[0] - eDr},${s[1] - eDc}`);
-        existCells.add(`${e[0] + eDr},${e[1] + eDc}`);
-        for (const cell of newCells) {
-          if (existCells.has(cell)) return false;
-        }
-      }
-    }
-
-    for (const ch of word) {
+    for (let i = 0; i < word.length; i++) {
       if (!(rr >= 0 && rr < rows && cc >= 0 && cc < cols)) return false;
       const existing = grid[rr][cc];
-      if (existing !== '' && existing !== ch) return false;
-      if (existing === ch) hasIntersection = true;
+      if (existing !== '' && existing !== word[i]) return false;
+      if (existing === word[i]) hasIntersection = true;
       rr += dr;
       cc += dc;
     }
     if (mustIntersect && !hasIntersection) return false;
+
+    const blocks = blocksByAxis.get(axisOf(dr, dc));
+    if (!blocks) return true;
+    const newCells = [];
+    for (let i = 0; i < word.length; i++) newCells.push(`${r + i * dr},${c + i * dc}`);
+    newCells.push(`${r - dr},${c - dc}`);
+    newCells.push(`${r + word.length * dr},${c + word.length * dc}`);
+    for (const block of blocks) {
+      for (const cell of newCells) if (block.has(cell)) return false;
+    }
     return true;
   }
 
@@ -96,6 +104,7 @@ export function createLetterSoup(wordsPt, {
       rr += dr;
       cc += dc;
     }
+    rememberPlacement(coords, dr, dc);
     return coords;
   }
 
@@ -150,12 +159,10 @@ export function createLetterSoup(wordsPt, {
     }
   }
 
-  // Fill remaining empty tiles with alphabet in order, starting from W
+  // Fill remaining empty tiles with seeded random letters.
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  let ai = 0;
   for (const [r, c] of emptyTiles) {
-    grid[r][c] = alphabet[(22 + ai) % alphabet.length];
-    ai++;
+    grid[r][c] = alphabet[rng.randrange(alphabet.length)];
   }
 
   return { grid, placements, unplaced: [...tooLong, ...unplaced], messageCells };

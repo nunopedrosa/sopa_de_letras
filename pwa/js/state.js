@@ -20,7 +20,12 @@ export function loadSettings() {
 }
 
 export function saveSettings(s) {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function loadPuzzles() {
@@ -32,7 +37,12 @@ export function loadPuzzles() {
 }
 
 export function savePuzzles(list) {
-  localStorage.setItem(PUZZLES_KEY, JSON.stringify(list));
+  try {
+    localStorage.setItem(PUZZLES_KEY, JSON.stringify(list));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function getPuzzle(id) {
@@ -44,7 +54,7 @@ export function upsertPuzzle(p) {
   const i = list.findIndex(x => x.id === p.id);
   p.updatedAt = Date.now();
   if (i >= 0) list[i] = p; else list.push(p);
-  savePuzzles(list);
+  return savePuzzles(list);
 }
 
 export function deletePuzzle(id) {

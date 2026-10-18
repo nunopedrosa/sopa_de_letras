@@ -36,9 +36,20 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme
 
 const screens = ['home', 'setup', 'play', 'settings'];
 let currentScreen = 'home';
+
+// Stop timers and listeners owned by the play screen, and flush its save.
+function teardownPlay() {
+  const area = $('#play-area');
+  const fn = area && area._cleanup;
+  if (area) area._cleanup = null;
+  if (fn) fn();
+}
+
 function show(name) {
+  if (currentScreen === 'play' && name !== 'play') teardownPlay();
   currentScreen = name;
   for (const s of screens) $('#screen-' + s).classList.toggle('active', s === name);
+  if (name === 'home') renderHome();
 }
 
 // ---------- language ----------
@@ -220,7 +231,7 @@ function initSetup() {
     $('#secret-letters-row').classList.toggle('hidden', v !== 'letters');
     $('#secret-words-row').classList.toggle('hidden', v !== 'words');
   };
-  f.onsubmit = e => {
+  f.onsubmit = async e => {
     e.preventDefault();
     const el = f.elements;
     const form = {
@@ -240,22 +251,34 @@ function initSetup() {
       secretText: el.secretText.value,
       secretWordsText: el.secretWords.value,
     };
-    const created = buildPuzzles(form);
-    if (!created || !created.length) return;
-    created.forEach(upsertPuzzle);
-    openPuzzle(created[0].id);
+    const btn = f.querySelector('[type=submit]');
+    btn.disabled = true;
+    btn.textContent = t('generating');
+    // Let the label paint before generation blocks the main thread.
+    await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
+    try {
+      const created = buildPuzzles(form);
+      if (!created || !created.length) return;
+      if (!created.every(upsertPuzzle)) toast(t('errSave'));
+      openPuzzle(created[0].id);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = t('generate');
+    }
   };
 }
 
 // ---------- PLAY ----------
 function openPuzzle(id) {
+  // Flush the puzzle on screen before reading storage, so a language
+  // switch or a reopen doesn't drop the last few edits.
+  teardownPlay();
   const p = getPuzzle(id);
   if (!p) { toast(t('errPuzzleNotFound')); return; }
   currentPuzzleId = id;
   show('play');
   const area = $('#play-area');
-  if (area._cleanup) area._cleanup();
-  const ctx = { settings, onExit: () => { currentPuzzleId = null; renderHome(); show('home'); }, toast };
+  const ctx = { settings, onExit: () => { currentPuzzleId = null; show('home'); }, toast };
   if (p.type === 'codeword') renderCodeword(area, p, ctx);
   else renderWordSearch(area, p, ctx);
 }
@@ -317,7 +340,6 @@ function init() {
   $('#btn-settings-back').onclick = () => show('home');
   initSetup();
   initSettings();
-  renderHome();
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').then(() => {

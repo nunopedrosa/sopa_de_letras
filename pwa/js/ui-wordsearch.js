@@ -151,18 +151,19 @@ export function renderWordSearch(container, puzzle, { settings, onExit, toast })
     const chip = wordsEl.querySelector(`[data-word="${word}"]`);
     if (chip) chip.classList.add('done');
     foundCountEl.textContent = `${state.found.length}/${Object.keys(placements).length}`;
-    save();
+    flushSave();
     if (state.found.length === Object.keys(placements).length) win();
   }
 
   function tryMatch(coords) {
-    if (coords.length < 2) return false;
+    if (!coords.length) return false;
     const word = placementKeys[cellKey(coords)];
     if (word && !state.found.includes(word)) {
       applyFound(word);
       return true;
     }
-    // wrong selection: flash
+    // A one-cell tap that isn't a word just clears. Longer misses flash.
+    if (coords.length < 2) return false;
     for (const [r, c] of coords) {
       const el = cells[r][c];
       el.classList.add('bad');
@@ -172,63 +173,108 @@ export function renderWordSearch(container, puzzle, { settings, onExit, toast })
   }
 
   // ---- pointer (drag) selection ----
+  // The grid rect is cached for the gesture. Preview DOM updates are
+  // coalesced to one frame and skipped when the cell didn't change,
+  // so a drag doesn't force layout on every pointer event.
   gridEl.style.touchAction = 'none';
   let dragAnchor = null;
+  let dragRect = null;
+  let hoverCell = null;
+  let previewFrame = 0;
+
+  function previewKey(coords) {
+    let key = '';
+    for (const [r, c] of coords) key += r + ',' + c + '|';
+    return key;
+  }
+
+  function previewLine(ar, ac, r, c) {
+    const [er, ec] = snappedEnd(ar, ac, r, c);
+    return lineCells(ar, ac, er, ec);
+  }
+
+  function paintPreview(coords) {
+    if (previewKey(preview) === previewKey(coords)) return;
+    showPreview(coords);
+  }
+
+  function cancelPreviewFrame() {
+    if (previewFrame) cancelAnimationFrame(previewFrame);
+    previewFrame = 0;
+  }
 
   gridEl.addEventListener('pointerdown', e => {
-    const t = e.target.closest('.ws-cell');
-    if (!t) return;
+    const cell = e.target.closest('.ws-cell');
+    if (!cell) return;
     e.preventDefault();
-    const r = +t.dataset.r, c = +t.dataset.c;
+    const r = +cell.dataset.r, c = +cell.dataset.c;
     if (anchor) {
-      // second tap completes the selection
-      const [er, ec] = snappedEnd(anchor[0], anchor[1], r, c);
-      const coords = lineCells(anchor[0], anchor[1], er, ec);
+      const coords = previewLine(anchor[0], anchor[1], r, c);
       clearPreview();
       tryMatch(coords);
       anchor = null;
       return;
     }
     dragAnchor = [r, c];
-    dragging = false; // becomes true on move
+    dragRect = gridEl.getBoundingClientRect();
+    hoverCell = [r, c];
+    dragging = false;
     gridEl.setPointerCapture(e.pointerId);
     showPreview([[r, c]]);
   });
 
   gridEl.addEventListener('pointermove', e => {
-    if (!dragAnchor) return;
-    const rect = gridEl.getBoundingClientRect();
-    const cw = rect.width / cols, ch = rect.height / rows;
-    const c = Math.floor((e.clientX - rect.left) / cw);
-    const r = Math.floor((e.clientY - rect.top) / ch);
+    if (!dragAnchor || !dragRect) return;
+    const cw = dragRect.width / cols, ch = dragRect.height / rows;
+    const c = Math.floor((e.clientX - dragRect.left) / cw);
+    const r = Math.floor((e.clientY - dragRect.top) / ch);
     if (r < 0 || r >= rows || c < 0 || c >= cols) return;
+    if (hoverCell && hoverCell[0] === r && hoverCell[1] === c) return;
+    hoverCell = [r, c];
     dragging = true;
-    const [er, ec] = snappedEnd(dragAnchor[0], dragAnchor[1], r, c);
-    showPreview(lineCells(dragAnchor[0], dragAnchor[1], er, ec));
+    if (previewFrame) return;
+    previewFrame = requestAnimationFrame(() => {
+      previewFrame = 0;
+      if (!dragAnchor || !hoverCell) return;
+      paintPreview(previewLine(dragAnchor[0], dragAnchor[1], hoverCell[0], hoverCell[1]));
+    });
   });
 
-  gridEl.addEventListener('pointerup', () => {
+  function finishDrag(commit) {
+    cancelPreviewFrame();
     if (!dragAnchor) return;
+    if (commit && dragging && hoverCell) {
+      paintPreview(previewLine(dragAnchor[0], dragAnchor[1], hoverCell[0], hoverCell[1]));
+    }
     const wasDrag = dragging;
     const coords = preview.slice();
     const tapCell = dragAnchor.slice();
     dragAnchor = null;
+    dragRect = null;
+    hoverCell = null;
     dragging = false;
+    if (!commit) {
+      clearPreview();
+      return;
+    }
     if (wasDrag && coords.length >= 2) {
       clearPreview();
       tryMatch(coords);
+    } else if (tryMatch([tapCell])) {
+      // A one-letter word is found with a single tap.
+      clearPreview();
+    } else if (anchor && anchor[0] === tapCell[0] && anchor[1] === tapCell[1]) {
+      anchor = null;
+      clearPreview();
     } else {
-      // a simple tap: set tap-tap anchor (tapping the anchor again clears it)
-      if (anchor && anchor[0] === tapCell[0] && anchor[1] === tapCell[1]) {
-        anchor = null;
-        clearPreview();
-      } else {
-        anchor = tapCell;
-        markAnchor(tapCell[0], tapCell[1]);
-        focusCell = tapCell;
-      }
+      anchor = tapCell;
+      markAnchor(tapCell[0], tapCell[1]);
+      focusCell = tapCell;
     }
-  });
+  }
+
+  gridEl.addEventListener('pointerup', () => finishDrag(true));
+  gridEl.addEventListener('pointercancel', () => finishDrag(false));
 
   // ---- keyboard support ----
   gridEl.tabIndex = 0;
@@ -262,7 +308,7 @@ export function renderWordSearch(container, puzzle, { settings, onExit, toast })
   });
 
   // ---- controls ----
-  container.querySelector('#btn-back').onclick = () => { stopTimer(); save(); onExit(); };
+  container.querySelector('#btn-back').onclick = () => onExit();
 
   container.querySelector('#btn-hint').onclick = () => {
     const remaining = Object.keys(placements).filter(w => !state.found.includes(w));
@@ -273,7 +319,7 @@ export function renderWordSearch(container, puzzle, { settings, onExit, toast })
     el.classList.add('hinted');
     setTimeout(() => el.classList.remove('hinted'), 1500);
     state.hints = (state.hints || 0) + 1;
-    save();
+    flushSave();
   };
 
   container.querySelector('#btn-print').onclick = async e => {
@@ -309,50 +355,74 @@ export function renderWordSearch(container, puzzle, { settings, onExit, toast })
   }
 
   // ---- timer ----
+  // Paused while the page is hidden, so background time is not counted
+  // and the interval does not keep waking the device.
   let timerId = null;
-  function tick() {
-    state.elapsed = (state.elapsed || 0) + 1;
-    const m = Math.floor(state.elapsed / 60), s = state.elapsed % 60;
+  let saveErrorShown = false;
+  function showElapsed() {
+    const secs = state.elapsed || 0;
+    const m = Math.floor(secs / 60), s = secs % 60;
     timerEl.textContent = `${m}:${String(s).padStart(2, '0')}`;
   }
+  function tick() {
+    state.elapsed = (state.elapsed || 0) + 1;
+    showElapsed();
+  }
   function startTimer() {
-    if (state.elapsed) {
-      const m = Math.floor(state.elapsed / 60), s = state.elapsed % 60;
-      timerEl.textContent = `${m}:${String(s).padStart(2, '0')}`;
-    }
-    if (settings.timer && !state.done) timerId = setInterval(tick, 1000);
+    if (timerId || state.done || !settings.timer || document.hidden) return;
+    timerId = setInterval(tick, 1000);
   }
   function stopTimer() { if (timerId) clearInterval(timerId); timerId = null; }
 
-  // Called before this container is re-rendered/discarded
-  container._cleanup = () => stopTimer();
+  function flushSave() {
+    puzzle.state = state;
+    if (!upsertPuzzle(puzzle) && !saveErrorShown) {
+      saveErrorShown = true;
+      if (toast) toast(t('errSave'));
+    }
+  }
 
-  function save() { puzzle.state = state; upsertPuzzle(puzzle); }
+  function onVisibility() {
+    if (document.hidden) { stopTimer(); flushSave(); }
+    else startTimer();
+  }
+  document.addEventListener('visibilitychange', onVisibility);
+  container._cleanup = () => {
+    stopTimer();
+    document.removeEventListener('visibilitychange', onVisibility);
+    flushSave();
+  };
 
   // ---- win + secret message ----
-  function win() {
-    state.done = true;
-    stopTimer();
-    save();
+  // Built the same way on a fresh win and on resume, so leaving the
+  // puzzle does not skip the secret step or reveal it early.
+  function renderSecretPanel(scroll) {
     msgPanel.classList.remove('hidden');
-    const secs = state.elapsed || 0;
-    const fmt = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
-    const timeTxt = settings.timer ? t('inTime', { time: fmt }) : '';
+    showElapsed();
+    const timeTxt = settings.timer ? t('inTime', { time: timerEl.textContent }) : '';
     let html = `<div class="win">${t('foundAll', { time: timeTxt })}</div>`;
 
     if (secretMessage && secretMessage.type === 'letters') {
-      html += `<button class="btn" id="btn-reveal">${t('revealSecret')}</button>
-               <div id="secret-text" class="secret-text hidden"></div>`;
-      msgPanel.innerHTML = html;
-      msgPanel.querySelector('#btn-reveal').onclick = () => {
-        // Animate the leftover cells in reading order
-        messageCells.forEach(([r, c], i) => {
-          setTimeout(() => cells[r][c].classList.add('secret'), 120 * i);
-        });
-        const st = msgPanel.querySelector('#secret-text');
-        st.classList.remove('hidden');
-        st.textContent = `🔐 ${secretMessage.text}`;
-      };
+      if (state.secretRevealed) {
+        html += `<div id="secret-text" class="secret-text"></div>`;
+        msgPanel.innerHTML = html;
+        msgPanel.querySelector('#secret-text').textContent = secretMessage.text;
+        if (messageCells) messageCells.forEach(([r, c]) => cells[r][c].classList.add('secret'));
+      } else {
+        html += `<button class="btn" id="btn-reveal">${t('revealSecret')}</button>
+                 <div id="secret-text" class="secret-text hidden"></div>`;
+        msgPanel.innerHTML = html;
+        msgPanel.querySelector('#btn-reveal').onclick = () => {
+          state.secretRevealed = true;
+          messageCells.forEach(([r, c], i) => {
+            setTimeout(() => cells[r][c].classList.add('secret'), 120 * i);
+          });
+          const st = msgPanel.querySelector('#secret-text');
+          st.classList.remove('hidden');
+          st.textContent = secretMessage.text;
+          flushSave();
+        };
+      }
     } else if (secretMessage && secretMessage.type === 'words') {
       html += `<p>${t('sortInstructions')}</p>
                <div id="sort-words" class="sort-words"></div>
@@ -371,7 +441,7 @@ export function renderWordSearch(container, puzzle, { settings, onExit, toast })
           chip.textContent = w;
           chip.onclick = () => {
             if (pick === null) { pick = i; }
-            else { [order[pick], order[i]] = [order[i], order[pick]]; pick = null; save(); }
+            else { [order[pick], order[i]] = [order[i], order[pick]]; pick = null; flushSave(); }
             drawSort();
           };
           box.appendChild(chip);
@@ -393,20 +463,18 @@ export function renderWordSearch(container, puzzle, { settings, onExit, toast })
     } else {
       msgPanel.innerHTML = html;
     }
-    msgPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (scroll) msgPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
-  // restore win state on reload
-  if (state.done) {
-    msgPanel.classList.remove('hidden');
-    msgPanel.innerHTML = `<div class="win">${t('puzzleDone')}</div>` +
-      (secretMessage && secretMessage.type === 'letters'
-        ? `<div class="secret-text">🔐 ${escapeHtml(secretMessage.text)}</div>` : '');
-    if (secretMessage && secretMessage.type === 'letters' && messageCells) {
-      messageCells.forEach(([r, c]) => cells[r][c].classList.add('secret'));
-    }
+  function win() {
+    state.done = true;
+    stopTimer();
+    flushSave();
+    renderSecretPanel(true);
   }
 
+  showElapsed();
+  if (state.done) renderSecretPanel(false);
   startTimer();
 }
 

@@ -51,6 +51,9 @@ export function renderCodeword(container, puzzle, { settings, onExit, toast }) {
   gridEl.style.setProperty('--cols', cols);
 
   const cells = [];
+  const cellsByNum = {};
+  const letterCells = [];
+  const kbButtons = [];
   let selected = null; // [r,c]
 
   for (let r = 0; r < rows; r++) {
@@ -66,7 +69,10 @@ export function renderCodeword(container, puzzle, { settings, onExit, toast }) {
         d.dataset.c = c;
         d.dataset.num = num;
         d.innerHTML = `<span class="cw-num">${num}</span><span class="cw-letter"></span>`;
+        d._letter = d.querySelector('.cw-letter');
         d.tabIndex = 0;
+        (cellsByNum[num] ||= []).push(d);
+        letterCells.push(d);
       }
       gridEl.appendChild(d);
       cells[r][c] = d;
@@ -87,58 +93,69 @@ export function renderCodeword(container, puzzle, { settings, onExit, toast }) {
     countEl.textContent = t('lettersCount', { f: filled, t: usedNums.length });
   }
 
-  function paint() {
-    for (let r = 0; r < rows; r++)
-      for (let c = 0; c < cols; c++) {
-        const el = cells[r][c];
-        const num = el.dataset && el.dataset.num;
-        if (!num) continue;
-        const span = el.querySelector('.cw-letter');
-        const letter = state.entries[num] || '';
-        span.textContent = letter;
-        el.classList.toggle('hint', hintNums.has(+num));
-        el.classList.toggle('same', selected !== null && +num === +numberGrid[selected[0]][selected[1]]);
-        el.classList.remove('wrong', 'right');
-        if (state.checked && letter) {
-          el.classList.add(letter === solNumToLetter[num] ? 'right' : 'wrong');
-        }
+  function paintLetters(nums) {
+    for (const num of nums) {
+      const key = String(num);
+      const letter = state.entries[key] || '';
+      const mark = state.checked && letter
+        ? (letter === solNumToLetter[key] ? 'right' : 'wrong')
+        : '';
+      for (const el of cellsByNum[key] || []) {
+        el._letter.textContent = letter;
+        el.classList.toggle('hint', hintNums.has(+key));
+        el.classList.toggle('right', mark === 'right');
+        el.classList.toggle('wrong', mark === 'wrong');
       }
-    for (const el of gridEl.querySelectorAll('.cw-cell')) el.classList.remove('selected');
+    }
+  }
+
+  function paintSelection() {
+    const selNum = selected ? String(numberGrid[selected[0]][selected[1]]) : null;
+    for (const el of letterCells) {
+      el.classList.toggle('same', selNum !== null && el.dataset.num === selNum);
+      el.classList.remove('selected');
+    }
     if (selected) cells[selected[0]][selected[1]].classList.add('selected');
     updateCount();
-    // keyboard availability: a letter may only map to one number
     const usedLetters = new Set(Object.values(state.entries));
-    for (const btn of kbEl.querySelectorAll('button[data-letter]')) {
+    for (const btn of kbButtons) {
       const L = btn.dataset.letter;
-      const curNum = selected ? numberGrid[selected[0]][selected[1]] : null;
-      btn.disabled = usedLetters.has(L) && state.entries[curNum] !== L;
+      btn.disabled = usedLetters.has(L) && state.entries[selNum] !== L;
     }
   }
 
   function assign(letter) {
     if (!selected) return;
-    const num = numberGrid[selected[0]][selected[1]];
+    const num = String(numberGrid[selected[0]][selected[1]]);
     if (!num || hintNums.has(+num)) return;
+    const affected = new Set([num]);
     if (letter === '') {
       delete state.entries[num];
     } else {
       // a letter can only map to one number: remove it elsewhere
       for (const [n, l] of Object.entries(state.entries)) {
-        if (l === letter && +n !== +num && !hintNums.has(+n)) delete state.entries[n];
+        if (l === letter && n !== num && !hintNums.has(+n)) {
+          delete state.entries[n];
+          affected.add(n);
+        }
       }
       state.entries[num] = letter;
     }
-    state.checked = false;
-    paint();
-    save();
+    // Manual check marks are cleared by an edit. Auto-check stays on.
+    const wasChecked = !!state.checked;
+    if (!settings.codewordAutoCheck) state.checked = false;
+    if (wasChecked && !state.checked) paintLetters(usedNums);
+    else paintLetters(affected);
+    paintSelection();
+    scheduleSave();
     checkWin();
   }
 
   gridEl.addEventListener('pointerdown', e => {
-    const t = e.target.closest('.cw-cell');
-    if (!t || !t.dataset.num) return;
-    selected = [+t.dataset.r, +t.dataset.c];
-    paint();
+    const cell = e.target.closest('.cw-cell');
+    if (!cell || !cell.dataset.num) return;
+    selected = [+cell.dataset.r, +cell.dataset.c];
+    paintSelection();
   });
 
   // physical keyboard
@@ -158,7 +175,7 @@ export function renderCodeword(container, puzzle, { settings, onExit, toast }) {
         if (numberGrid[r][c]) break;
       }
       selected = [r, c];
-      paint();
+      paintSelection();
       e.preventDefault();
     }
   }
@@ -172,6 +189,7 @@ export function renderCodeword(container, puzzle, { settings, onExit, toast }) {
       b.textContent = letter;
       b.dataset.letter = letter;
       b.onclick = () => assign(letter);
+      kbButtons.push(b);
       div.appendChild(b);
     }
     kbEl.appendChild(div);
@@ -184,9 +202,10 @@ export function renderCodeword(container, puzzle, { settings, onExit, toast }) {
 
   container.querySelector('#btn-check').onclick = () => {
     state.checked = true;
-    paint();
-    save();
-    checkWin(true);
+    paintLetters(usedNums);
+    paintSelection();
+    flushSave();
+    checkWin();
   };
   container.querySelector('#btn-print').onclick = async e => {
     const btn = e.currentTarget;
@@ -198,52 +217,82 @@ export function renderCodeword(container, puzzle, { settings, onExit, toast }) {
     if (confirm(t('confirmSolution'))) {
       for (const num of usedNums) state.entries[num] = solNumToLetter[num];
       state.done = true;
-      paint();
-      save();
+      paintLetters(usedNums);
+      paintSelection();
+      flushSave();
       stopTimer();
     }
   };
-  container.querySelector('#btn-back').onclick = () => {
-    document.removeEventListener('keydown', onKey);
-    stopTimer();
-    save();
-    onExit();
-  };
+  container.querySelector('#btn-back').onclick = () => onExit();
 
-  function checkWin(fromCheck = false) {
+  function checkWin() {
     const solved = usedNums.every(n => state.entries[n] === solNumToLetter[n]);
-    if (solved) {
-      state.done = true;
-      stopTimer();
-      save();
-      const mp = container.querySelector('#msg-panel');
-      mp.classList.remove('hidden');
-      mp.innerHTML = `<div class="win">${t('cwDone')}</div>`;
-      toast && toast(t('puzzleSolved'));
-    }
+    if (!solved || state.done) return;
+    state.done = true;
+    stopTimer();
+    flushSave();
+    const mp = container.querySelector('#msg-panel');
+    mp.classList.remove('hidden');
+    mp.innerHTML = `<div class="win">${t('cwDone')}</div>`;
+    if (toast) toast(t('puzzleSolved'));
   }
 
-  // ---- timer ----
+  // ---- timer + save ----
+  // Letter edits are batched. The write is flushed when the page hides,
+  // the puzzle is torn down, or the player pauses for a moment.
   let timerId = null;
+  let saveTimer = null;
+  let saveErrorShown = false;
+  function showElapsed() {
+    const secs = state.elapsed || 0;
+    const m = Math.floor(secs / 60), s = secs % 60;
+    timerEl.textContent = `${m}:${String(s).padStart(2, '0')}`;
+  }
   function tick() {
     state.elapsed = (state.elapsed || 0) + 1;
-    const m = Math.floor(state.elapsed / 60), s = state.elapsed % 60;
-    timerEl.textContent = `${m}:${String(s).padStart(2, '0')}`;
+    showElapsed();
   }
-  if (settings.timer && !state.done) timerId = setInterval(tick, 1000);
+  function startTimer() {
+    if (timerId || state.done || !settings.timer || document.hidden) return;
+    timerId = setInterval(tick, 1000);
+  }
   function stopTimer() { if (timerId) clearInterval(timerId); timerId = null; }
 
-  // Called before this container is re-rendered/discarded
-  container._cleanup = () => { stopTimer(); document.removeEventListener('keydown', onKey); };
-  if (state.elapsed) {
-    const m = Math.floor(state.elapsed / 60), s = state.elapsed % 60;
-    timerEl.textContent = `${m}:${String(s).padStart(2, '0')}`;
+  function flushSave() {
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+    puzzle.state = state;
+    if (!upsertPuzzle(puzzle) && !saveErrorShown) {
+      saveErrorShown = true;
+      if (toast) toast(t('errSave'));
+    }
+  }
+  function scheduleSave() {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(flushSave, 400);
   }
 
-  function save() { puzzle.state = state; upsertPuzzle(puzzle); }
+  function onVisibility() {
+    if (document.hidden) { stopTimer(); flushSave(); }
+    else startTimer();
+  }
+  document.addEventListener('visibilitychange', onVisibility);
+  container._cleanup = () => {
+    stopTimer();
+    document.removeEventListener('keydown', onKey);
+    document.removeEventListener('visibilitychange', onVisibility);
+    flushSave();
+  };
 
+  showElapsed();
   if (settings.codewordAutoCheck) state.checked = true;
-  paint();
+  paintLetters(usedNums);
+  paintSelection();
+  if (state.done) {
+    const mp = container.querySelector('#msg-panel');
+    mp.classList.remove('hidden');
+    mp.innerHTML = `<div class="win">${t('cwDone')}</div>`;
+  }
+  startTimer();
 }
 
 function escapeHtml(s) {
