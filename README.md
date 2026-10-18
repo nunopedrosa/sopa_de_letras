@@ -277,6 +277,43 @@ The current implementation uses a word-sorting method where players must find al
 
 These methods all require completing the puzzle first, making them suitable for scavenger hunts and educational activities.
 
+## PWA (Progressive Web App)
+
+The `pwa/` folder contains a fully offline-capable web version of the game — both word search and codeword puzzles — with an interactive player interface. No build step is required; it's plain HTML/CSS/JS modules.
+
+### Running locally
+
+```bash
+cd pwa
+python3 -m http.server 8765
+# open http://localhost:8765
+```
+
+A local server (or any static host) is required because service workers don't work from `file://`. Once loaded, the app works completely offline: generating, saving, and playing puzzles all happen in the browser.
+
+### Deploying
+
+Upload the contents of `pwa/` to any static host (e.g. GitHub Pages — the relative paths work in subfolders like `/sopa_de_letras/pwa/`). HTTPS is required for the service worker outside localhost.
+
+**Dreamhost (ramen.basecentral.link):** clone the repo into a private directory on the server, then run `deploy.sh`. It pulls the latest checkout and rsyncs `pwa/` into the site directory (`~/ramen.basecentral.link` by default — override with `SITE_DIR=`/`REPO_DIR=` env vars). `--no-pull` skips the git pull, `--dry-run` previews the copy. The sync mirrors `pwa/` exactly (stale files are deleted) but protects `.htaccess`, `.well-known/` (Let's Encrypt), `stats/`, and `favicon.ico` in the web root.
+
+### PWA features
+
+- **Installable**: "Add to Home Screen" on iOS/Android, or the install icon in desktop browsers.
+- **Offline**: a service worker precaches the whole app shell; puzzle generation and saved games are local-only (`localStorage`).
+- **Player interface**: drag/swipe or tap-tap word selection (plus keyboard: arrows + Enter), per-word pastel / single / subtle highlight styles, hints, solution view, and a timer.
+- **PDF export**: the 🖨 button on the play screen generates a 2-page A4 PDF — puzzle on page 1 (with secret-message / codeword notes), solution on page 2 — in the currently selected language. Uses vendored jsPDF (`js/vendor/`), so it works offline.
+- **Secret messages**: both modes from the Python version — leftover letters revealed in reading order, or leftover words the player sorts.
+- **Saved puzzles**: progress is auto-saved and resumable from the home screen.
+- **Multilingual UI**: Portuguese and English, switchable via the flag button in the header. Puzzle words keep the language they were created in. To add another language, add an entry to `LANGUAGES` and a string table to `STRINGS` in `js/i18n.js`.
+- **Version check**: Settings → "Procurar atualizações" fetches `version.json` (always network-only) and compares it with the bundled version; an "Atualizar" button activates the new service worker and reloads.
+
+### Releasing an update
+
+1. Bump the version in **three** places: `pwa/version.json`, `APP_VERSION` in `pwa/js/updater.js`, and the `CACHE` name in `pwa/sw.js` (changing the cache name is what forces assets to be re-fetched).
+2. If you added/removed files, update the `ASSETS` list in `pwa/sw.js`.
+3. Deploy. Users will see the update available in Settings → "Procurar atualizações".
+
 ## License
 
 See LICENSE file for details.

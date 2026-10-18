@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#8fbce6">
+  <title>Sopa de Letras</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="app-head">
+    <h1>🍲 Ramen - <span data-i18n="appTitle">Sopa de Letras</span></h1>
+    <div class="head-actions">
+      <div class="lang-wrap">
+        <button id="btn-lang" class="btn-icon" data-i18n-title="language" title="Idioma">🇵🇹</button>
+        <div id="lang-menu" class="lang-menu hidden"></div>
+      </div>
+      <button id="btn-nav-settings" class="btn-icon" data-i18n-title="settings" title="Definições">⚙</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- HOME -->
+    <section id="screen-home" class="screen">
+      <button id="btn-new" class="btn big" data-i18n="newPuzzle">＋ Novo puzzle</button>
+      <h2 data-i18n="savedPuzzles">Puzzles guardados</h2>
+      <ul id="puzzle-list" class="puzzle-list"></ul>
+    </section>
+
+    <!-- SETUP -->
+    <section id="screen-setup" class="screen">
+      <h2 data-i18n="newPuzzleTitle">Novo puzzle</h2>
+      <form id="setup-form">
+        <label><span data-i18n="nameOptional">Nome (opcional)</span>
+          <input type="text" name="pname" data-i18n-ph="namePh" placeholder="Ex.: Puzzle do Afonso">
+        </label>
+
+        <label><span data-i18n="puzzleType">Tipo de puzzle</span>
+          <select name="ptype">
+            <option value="wordsearch" data-i18n="wordsearch">Sopa de letras</option>
+            <option value="codeword" data-i18n="codeword">Codeword</option>
+            <option value="both" data-i18n="both">Ambos</option>
+          </select>
+        </label>
+
+        <label><span data-i18n="wordsLabel">Palavras (uma por linha)</span>
+          <textarea name="words" rows="7" required data-i18n-ph="wordsPh" placeholder="casa&#10;bola&#10;gato"></textarea>
+        </label>
+        <div class="row">
+          <label class="grow"><span data-i18n="examples">Exemplos</span>
+            <select name="example">
+              <option value="" data-i18n="choose">— escolher —</option>
+              <option value="palavras" data-i18n="exPortugal">História de Portugal</option>
+              <option value="bluey">Bluey</option>
+              <option value="livros" data-i18n="exBooks">Livros</option>
+              <option value="martinho" data-i18n="exMartinho">São Martinho</option>
+            </select>
+          </label>
+          <label class="grow"><span data-i18n="importTxt">Importar .txt</span>
+            <input type="file" name="import" accept=".txt,text/plain">
+          </label>
+        </div>
+
+        <fieldset>
+          <legend data-i18n="wordsearch">Sopa de letras</legend>
+          <div class="row">
+            <label><span data-i18n="rows">Linhas</span> <input type="number" name="rows" min="5" max="25" value="15"></label>
+            <label><span data-i18n="cols">Colunas</span> <input type="number" name="cols" min="5" max="25" value="15"></label>
+          </div>
+          <label class="check"><input type="checkbox" name="diagonals"> <span data-i18n="diagonals">Diagonais</span></label>
+          <label class="check"><input type="checkbox" name="backwards"> <span data-i18n="backwards">Palavras ao contrário</span></label>
+          <label class="check"><input type="checkbox" name="intersections"> <span data-i18n="intersections">Palavras têm de se cruzar</span></label>
+        </fieldset>
+
+        <fieldset>
+          <legend data-i18n="codeword">Codeword</legend>
+          <div class="row">
+            <label><span data-i18n="rows">Linhas</span> <input type="number" name="cwRows" min="5" max="25" value="15"></label>
+            <label><span data-i18n="cols">Colunas</span> <input type="number" name="cwCols" min="5" max="25" value="15"></label>
+            <label><span data-i18n="hints">Dicas</span> <input type="number" name="cwHints" min="0" max="26" value="3"></label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend data-i18n="secretMessage">Mensagem secreta</legend>
+          <label><span data-i18n="type">Tipo</span>
+            <select name="secretType">
+              <option value="none" data-i18n="none">Nenhuma</option>
+              <option value="letters" data-i18n="secretLetters">Letras que sobram na grelha</option>
+              <option value="words" data-i18n="secretWordsOpt">Palavras para ordenar</option>
+            </select>
+          </label>
+          <label id="secret-letters-row" class="hidden"><span data-i18n="secretTextLabel">Texto da mensagem</span>
+            <input type="text" name="secretText" data-i18n-ph="secretTextPh" placeholder="Ex.: O TESOURO ESTA NA COZINHA">
+          </label>
+          <label id="secret-words-row" class="hidden"><span data-i18n="secretWordsLabel">Palavras da mensagem (uma por linha, na ordem)</span>
+            <textarea name="secretWords" rows="4" data-i18n-ph="secretWordsPh" placeholder="encontra&#10;o&#10;tesouro&#10;na&#10;biblioteca"></textarea>
+          </label>
+        </fieldset>
+
+        <label><span data-i18n="seedLabel">Seed (opcional — o mesmo seed gera o mesmo puzzle)</span>
+          <input type="number" name="seed" data-i18n-ph="seedPh" placeholder="aleatório">
+        </label>
+
+        <div class="row">
+          <button type="submit" class="btn big grow" data-i18n="generate">Gerar puzzle</button>
+          <button type="button" id="btn-setup-cancel" class="btn ghost" data-i18n="cancel">Cancelar</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- PLAY -->
+    <section id="screen-play" class="screen">
+      <div id="play-area"></div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="screen-settings" class="screen">
+      <h2 data-i18n="settings">Definições</h2>
+
+      <label><span data-i18n="highlightLabel">Destaque das palavras encontradas</span>
+        <select id="set-highlight">
+          <option value="colors" data-i18n="hlColors">Cor diferente por palavra</option>
+          <option value="single" data-i18n="hlSingle">Cor única</option>
+          <option value="subtle" data-i18n="hlSubtle">Subtil (negrito)</option>
+        </select>
+      </label>
+
+      <label><span data-i18n="theme">Tema</span>
+        <select id="set-theme">
+          <option value="auto" data-i18n="themeAuto">Automático</option>
+          <option value="light" data-i18n="themeLight">Claro</option>
+          <option value="dark" data-i18n="themeDark">Escuro</option>
+        </select>
+      </label>
+
+      <label class="check"><input type="checkbox" id="set-timer"> <span data-i18n="showTimer">Mostrar cronómetro</span></label>
+      <label class="check"><input type="checkbox" id="set-autocheck"> <span data-i18n="cwAutoCheck">Codeword: verificar automaticamente</span></label>
+
+      <fieldset>
+        <legend data-i18n="updates">Atualizações</legend>
+        <p><span data-i18n="installedVersion">Versão instalada:</span> <strong id="app-version"></strong></p>
+        <p id="update-status"></p>
+        <button id="btn-check-update" class="btn" data-i18n="checkUpdates">Procurar atualizações</button>
+        <button id="btn-update" class="btn hidden" data-i18n="updateNow">⬇ Atualizar agora</button>
+      </fieldset>
+
+      <button id="btn-settings-back" class="btn ghost" data-i18n="back">← Voltar</button>
+    </section>
+  </main>
+
+  <div id="toast" role="status"></div>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
