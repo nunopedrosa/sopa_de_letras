@@ -2,7 +2,7 @@
 // version.json is fetched network-only (the SW special-cases it),
 // compared against APP_VERSION, and an Update button triggers
 // skipWaiting -> reload (with a cache-bust fallback).
-export const APP_VERSION = '1.2.3';
+export const APP_VERSION = '1.2.4';
 
 export async function checkForUpdate() {
   if (!('serviceWorker' in navigator)) return { status: 'unsupported' };

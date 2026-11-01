@@ -1,0 +1,29 @@
+# App-owned publication contract; common engine: BaseCentral deploy 1.0.0.
+APP_ID=sopa_de_letras
+SOURCE_SUBDIR=pwa
+DEFAULT_DESTINATION="${SITE_DIR:-$HOME/ramen.basecentral.link}"
+DEPLOY_URL=https://ramen.basecentral.link
+PUBLIC_FILES=$(cat <<'PUBLIC_FILES'
+css/style.css
+icons/icon-192.png
+icons/icon-512-maskable.png
+icons/icon-512.png
+index.html
+js/app.js
+js/generator.js
+js/i18n.js
+js/pdf.js
+js/rng.js
+js/state.js
+js/ui-codeword.js
+js/ui-wordsearch.js
+js/updater.js
+js/vendor/jspdf.umd.min.js
+manifest.webmanifest
+shared-chevron.svg
+shared-controls.css
+shared-icons.svg
+sw.js
+version.json
+PUBLIC_FILES
+)

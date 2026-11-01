@@ -99,7 +99,7 @@ function renderHome() {
         <span class="puzzle-name">${escapeHtml(p.name)}${done}</span>
         <span class="puzzle-meta">${typeLabel} · ${dims.length}×${dims[0].length} · ${date}</span>
       </button>
-      <button class="btn-icon del" title="🗑">🗑</button>`;
+      <button class="btn-icon del pwa-control" title="🗑">🗑</button>`;
     li.querySelector('.puzzle-item').onclick = () => openPuzzle(p.id);
     li.querySelector('.del').onclick = () => {
       if (confirm(t('deleteConfirm', { name: p.name }))) { deletePuzzle(p.id); renderHome(); }

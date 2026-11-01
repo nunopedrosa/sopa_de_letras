@@ -263,3 +263,7 @@ html.dark .ws-cell.sol { background: #4a3d66; }
   .ws-grid { max-width: 62vh; }
   .cw-grid { max-width: 55vh; }
 }
+
+/* Shared controls 1.0.0: app-owned screen adapters. */
+@media screen {
+}

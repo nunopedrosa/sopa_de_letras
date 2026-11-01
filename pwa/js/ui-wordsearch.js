@@ -30,7 +30,7 @@ export function renderWordSearch(container, puzzle, { settings, onExit, toast })
 
   container.innerHTML = `
     <div class="play-head">
-      <button class="btn ghost" id="btn-back">${t('menu')}</button>
+      <button class="btn ghost pwa-control" id="btn-back">${t('menu')}</button>
       <div class="play-title">${escapeHtml(puzzle.name)}</div>
       <div class="play-stats">
         <span id="found-count">${state.found.length}/${Object.keys(placements).length}</span>
@@ -38,9 +38,9 @@ export function renderWordSearch(container, puzzle, { settings, onExit, toast })
       </div>
     </div>
     <div class="play-actions">
-      <button class="btn" id="btn-hint">${t('hint')}</button>
-      <button class="btn" id="btn-solution">${t('solution')}</button>
-      <button class="btn push-right" id="btn-print">${t('printBtn')}</button>
+      <button class="btn pwa-control" id="btn-hint">${t('hint')}</button>
+      <button class="btn pwa-control" id="btn-solution">${t('solution')}</button>
+      <button class="btn push-right pwa-control" id="btn-print">${t('printBtn')}</button>
     </div>
     <div id="ws-grid" class="ws-grid" role="grid" aria-label="${t('gridAria')}"></div>
     <div id="ws-words" class="ws-words" aria-label="${t('wordsAria')}"></div>
@@ -409,7 +409,7 @@ export function renderWordSearch(container, puzzle, { settings, onExit, toast })
         msgPanel.querySelector('#secret-text').textContent = secretMessage.text;
         if (messageCells) messageCells.forEach(([r, c]) => cells[r][c].classList.add('secret'));
       } else {
-        html += `<button class="btn" id="btn-reveal">${t('revealSecret')}</button>
+        html += `<button class="btn pwa-control" id="btn-reveal">${t('revealSecret')}</button>
                  <div id="secret-text" class="secret-text hidden"></div>`;
         msgPanel.innerHTML = html;
         msgPanel.querySelector('#btn-reveal').onclick = () => {
@@ -426,7 +426,7 @@ export function renderWordSearch(container, puzzle, { settings, onExit, toast })
     } else if (secretMessage && secretMessage.type === 'words') {
       html += `<p>${t('sortInstructions')}</p>
                <div id="sort-words" class="sort-words"></div>
-               <button class="btn" id="btn-check-msg">${t('check')}</button>
+               <button class="btn pwa-control" id="btn-check-msg">${t('check')}</button>
                <div id="msg-result" class="secret-text"></div>`;
       msgPanel.innerHTML = html;
       const box = msgPanel.querySelector('#sort-words');

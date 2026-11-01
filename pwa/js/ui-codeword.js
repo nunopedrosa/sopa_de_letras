@@ -26,15 +26,15 @@ export function renderCodeword(container, puzzle, { settings, onExit, toast }) {
 
   container.innerHTML = `
     <div class="play-head">
-      <button class="btn ghost" id="btn-back">${t('menu')}</button>
+      <button class="btn ghost pwa-control" id="btn-back">${t('menu')}</button>
       <div class="play-title">${escapeHtml(puzzle.name)}</div>
       <div class="play-stats"><span id="cw-count"></span>
         <span id="timer" class="timer ${settings.timer ? '' : 'hidden'}">0:00</span></div>
     </div>
     <div class="play-actions">
-      <button class="btn" id="btn-check">✔ ${t('check')}</button>
-      <button class="btn" id="btn-sol">${t('solution')}</button>
-      <button class="btn push-right" id="btn-print">${t('printBtn')}</button>
+      <button class="btn pwa-control" id="btn-check">✔ ${t('check')}</button>
+      <button class="btn pwa-control" id="btn-sol">${t('solution')}</button>
+      <button class="btn push-right pwa-control" id="btn-print">${t('printBtn')}</button>
     </div>
     <div id="cw-grid" class="cw-grid"></div>
     <div id="cw-kb" class="cw-kb"></div>

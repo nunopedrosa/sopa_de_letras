@@ -1,8 +1,9 @@
 // Service worker: precache the app shell; network-only for version.json
 // so the in-app update check is always honest.
-const CACHE = 'sopa-v1.2.3';
+const CACHE = 'sopa-v1.2.4';
 
 const ASSETS = [
+  './shared-controls.css', './shared-icons.svg','./shared-chevron.svg',
   './',
   'index.html',
   'manifest.webmanifest',

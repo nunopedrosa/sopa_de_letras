@@ -11,23 +11,24 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="shared-controls.css">
 </head>
 <body>
   <header class="app-head">
     <h1>🍲 Ramen - <span data-i18n="appTitle">Sopa de Letras</span></h1>
     <div class="head-actions">
       <div class="lang-wrap">
-        <button id="btn-lang" class="btn-icon" data-i18n-title="language" title="Idioma">🇵🇹</button>
+        <button id="btn-lang" class="btn-icon pwa-control" data-i18n-title="language" title="Idioma">🇵🇹</button>
         <div id="lang-menu" class="lang-menu hidden"></div>
       </div>
-      <button id="btn-nav-settings" class="btn-icon" data-i18n-title="settings" title="Definições">⚙</button>
+      <button id="btn-nav-settings" class="btn-icon pwa-control" data-i18n-title="settings" title="Definições"><svg class="pwa-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m9 3 .7-2h4.6l.7 2 2 1.2 2.1-.4 2.3 4-1.4 1.6v2.4l1.4 1.6-2.3 4-2.1-.4-2 1.2-.7 2H9.7l-.7-2-2-1.2-2.1.4-2.3-4L4 11.8V9.4L2.6 7.8l2.3-4 2.1.4Z" transform="translate(0 1)"/><circle cx="12" cy="12" r="3"/></svg></button>
     </div>
   </header>
 
   <main>
     <!-- HOME -->
     <section id="screen-home" class="screen">
-      <button id="btn-new" class="btn big" data-i18n="newPuzzle">＋ Novo puzzle</button>
+      <button id="btn-new" class="btn big pwa-control" data-i18n="newPuzzle">＋ Novo puzzle</button>
       <h2 data-i18n="savedPuzzles">Puzzles guardados</h2>
       <ul id="puzzle-list" class="puzzle-list"></ul>
     </section>
@@ -41,7 +42,7 @@
         </label>
 
         <label><span data-i18n="puzzleType">Tipo de puzzle</span>
-          <select name="ptype">
+          <select name="ptype" class="pwa-control">
             <option value="wordsearch" data-i18n="wordsearch">Sopa de letras</option>
             <option value="codeword" data-i18n="codeword">Codeword</option>
             <option value="both" data-i18n="both">Ambos</option>
@@ -53,7 +54,7 @@
         </label>
         <div class="row">
           <label class="grow"><span data-i18n="examples">Exemplos</span>
-            <select name="example">
+            <select name="example" class="pwa-control">
               <option value="" data-i18n="choose">— escolher —</option>
               <option value="palavras" data-i18n="exPortugal">História de Portugal</option>
               <option value="bluey">Bluey</option>
@@ -89,7 +90,7 @@
         <fieldset>
           <legend data-i18n="secretMessage">Mensagem secreta</legend>
           <label><span data-i18n="type">Tipo</span>
-            <select name="secretType">
+            <select name="secretType" class="pwa-control">
               <option value="none" data-i18n="none">Nenhuma</option>
               <option value="letters" data-i18n="secretLetters">Letras que sobram na grelha</option>
               <option value="words" data-i18n="secretWordsOpt">Palavras para ordenar</option>
@@ -108,8 +109,8 @@
         </label>
 
         <div class="row">
-          <button type="submit" class="btn big grow" data-i18n="generate">Gerar puzzle</button>
-          <button type="button" id="btn-setup-cancel" class="btn ghost" data-i18n="cancel">Cancelar</button>
+          <button type="submit" class="btn big grow pwa-control" data-i18n="generate">Gerar puzzle</button>
+          <button type="button" id="btn-setup-cancel" class="btn ghost pwa-control" data-i18n="cancel">Cancelar</button>
         </div>
       </form>
     </section>
@@ -124,7 +125,7 @@
       <h2 data-i18n="settings">Definições</h2>
 
       <label><span data-i18n="highlightLabel">Destaque das palavras encontradas</span>
-        <select id="set-highlight">
+        <select id="set-highlight" class="pwa-control">
           <option value="colors" data-i18n="hlColors">Cor diferente por palavra</option>
           <option value="single" data-i18n="hlSingle">Cor única</option>
           <option value="subtle" data-i18n="hlSubtle">Subtil (negrito)</option>
@@ -132,7 +133,7 @@
       </label>
 
       <label><span data-i18n="theme">Tema</span>
-        <select id="set-theme">
+        <select id="set-theme" class="pwa-control">
           <option value="auto" data-i18n="themeAuto">Automático</option>
           <option value="light" data-i18n="themeLight">Claro</option>
           <option value="dark" data-i18n="themeDark">Escuro</option>
@@ -146,11 +147,11 @@
         <legend data-i18n="updates">Atualizações</legend>
         <p><span data-i18n="installedVersion">Versão instalada:</span> <strong id="app-version"></strong></p>
         <p id="update-status"></p>
-        <button id="btn-check-update" class="btn" data-i18n="checkUpdates">Procurar atualizações</button>
-        <button id="btn-update" class="btn hidden" data-i18n="updateNow">⬇ Atualizar agora</button>
+        <button id="btn-check-update" class="btn pwa-control" data-i18n="checkUpdates">Procurar atualizações</button>
+        <button id="btn-update" class="btn hidden pwa-control" data-i18n="updateNow">⬇ Atualizar agora</button>
       </fieldset>
 
-      <button id="btn-settings-back" class="btn ghost" data-i18n="back">← Voltar</button>
+      <button id="btn-settings-back" class="btn ghost pwa-control" data-i18n="back">← Voltar</button>
     </section>
   </main>
 

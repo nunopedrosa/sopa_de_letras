@@ -317,3 +317,7 @@ Upload the contents of `pwa/` to any static host (e.g. GitHub Pages — the rela
 ## License
 
 See LICENSE file for details.
+
+## Shared deployment command (2026-11-01)
+
+See [the current deployment contract](docs/SHARED_DEPLOYMENT.md) and `scripts/deploy-profile.sh`. This supersedes older script flags, SSH-only wrappers and broad deletion instructions below/above; hosting coordinates and app-specific private/release requirements still apply. No deployment is authorized by source changes.
